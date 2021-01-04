@@ -2,9 +2,9 @@
 	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('three')) :
 	typeof define === 'function' && define.amd ? define(['exports', 'three'], factory) :
 	(global = global || self, factory(global.PANOLENS = {}, global.THREE));
-}(this, function (exports, THREE) { 'use strict';
+}(this, (function (exports, THREE) { 'use strict';
 
-	const version="0.11.0";const devDependencies={"@tweenjs/tween.js":"^17.4.0",ava:"^2.1.0","browser-env":"^3.2.6",concurrently:"^4.1.0",coveralls:"^3.0.4",docdash:"^1.1.1",eslint:"^5.16.0","google-closure-compiler":"^20190528.0.0","http-server":"^0.11.1",jsdoc:"^3.6.2",nyc:"^14.1.1",rollup:"^1.15.1","rollup-plugin-commonjs":"^10.0.0","rollup-plugin-inject":"^2.2.0","rollup-plugin-json":"^4.0.0","rollup-plugin-node-resolve":"^5.0.1",three:"^0.105.2",xmlhttprequest:"^1.8.0"};
+	const version="0.11.0";const devDependencies={"@rollup/plugin-commonjs":"^11.0.2","@rollup/plugin-inject":"^4.0.1","@rollup/plugin-json":"^4.0.2","@rollup/plugin-node-resolve":"^7.1.1","@tweenjs/tween.js":"^18.5.0",ava:"^3.5.0","browser-env":"^3.3.0",concurrently:"^5.1.0",coveralls:"^3.0.11",docdash:"^1.2.0",eslint:"^6.8.0",esm:"^3.2.25","google-closure-compiler":"^20200315.0.0","http-server":"^0.12.3",jsdoc:"^3.6.3","local-web-server":"^3.0.7",nyc:"^14.1.1",rollup:"^2.3.2",three:"^0.124.0",xmlhttprequest:"^1.8.0"};
 
 	/**
 	 * REVISION
@@ -281,13 +281,14 @@
 			   ImageLoader.load( url, function ( image ) {
 
 				   texture.images[ index ] = image;
-
+	  
 				   loaded++;
 
 				   if ( loaded === 6 ) {
 
 					   texture.needsUpdate = true;
 
+					   onProgress( { loaded, total: 6 } );
 					   onLoad( texture );
 
 				   }
@@ -720,8 +721,6 @@
 	            roffset.set( 0.5, 0.0 );
 	            break;
 
-	        default: break;
-
 	        }
 
 	    },
@@ -1055,11 +1054,8 @@
 
 	} );
 
-	function createCommonjsModule(fn, module) {
-		return module = { exports: {} }, fn(module, module.exports), module.exports;
-	}
+	var version$1 = '18.5.0';
 
-	var Tween = createCommonjsModule(function (module, exports) {
 	/**
 	 * Tween.js - Licensed under the MIT license
 	 * https://github.com/tweenjs/tween.js
@@ -1114,10 +1110,11 @@
 
 			time = time !== undefined ? time : TWEEN.now();
 
-			// Tweens are updated in "batches". If you add a new tween during an update, then the
-			// new tween will be updated in the next batch.
-			// If you remove a tween during an update, it may or may not be updated. However,
-			// if the removed tween was added during the current batch, then it will not be updated.
+			// Tweens are updated in "batches". If you add a new tween during an
+			// update, then the new tween will be updated in the next batch.
+			// If you remove a tween during an update, it may or may not be updated.
+			// However, if the removed tween was added during the current batch,
+			// then it will not be updated.
 			while (tweenIds.length > 0) {
 				this._tweensAddedDuringUpdate = {};
 
@@ -1182,6 +1179,8 @@
 
 
 	TWEEN.Tween = function (object, group) {
+		this._isPaused = false;
+		this._pauseStart = null;
 		this._object = object;
 		this._valuesStart = {};
 		this._valuesEnd = {};
@@ -1217,6 +1216,10 @@
 			return this._isPlaying;
 		},
 
+		isPaused: function () {
+			return this._isPaused;
+		},
+
 		to: function (properties, duration) {
 
 			this._valuesEnd = Object.create(properties);
@@ -1239,6 +1242,8 @@
 			this._group.add(this);
 
 			this._isPlaying = true;
+
+			this._isPaused = false;
 
 			this._onStartCallbackFired = false;
 
@@ -1265,8 +1270,10 @@
 					continue;
 				}
 
-				// Save the starting value.
-				this._valuesStart[property] = this._object[property];
+				// Save the starting value, but only once.
+				if (typeof(this._valuesStart[property]) === 'undefined') {
+					this._valuesStart[property] = this._object[property];
+				}
 
 				if ((this._valuesStart[property] instanceof Array) === false) {
 					this._valuesStart[property] *= 1.0; // Ensures we're using numbers, not strings
@@ -1287,7 +1294,10 @@
 			}
 
 			this._group.remove(this);
+
 			this._isPlaying = false;
+
+			this._isPaused = false;
 
 			if (this._onStopCallback !== null) {
 				this._onStopCallback(this._object);
@@ -1301,6 +1311,41 @@
 		end: function () {
 
 			this.update(Infinity);
+			return this;
+
+		},
+
+		pause: function(time) {
+
+			if (this._isPaused || !this._isPlaying) {
+				return this;
+			}
+
+			this._isPaused = true;
+
+			this._pauseStart = time === undefined ? TWEEN.now() : time;
+
+			this._group.remove(this);
+
+			return this;
+
+		},
+
+		resume: function(time) {
+
+			if (!this._isPaused || !this._isPlaying) {
+				return this;
+			}
+
+			this._isPaused = false;
+
+			this._startTime += (time === undefined ? TWEEN.now() : time)
+				- this._pauseStart;
+
+			this._pauseStart = 0;
+
+			this._group.add(this);
+
 			return this;
 
 		},
@@ -1970,19 +2015,7 @@
 		}
 
 	};
-
-	// UMD (Universal Module Definition)
-	(function (root) {
-
-		{
-
-			// Node.js
-			module.exports = TWEEN;
-
-		}
-
-	})();
-	});
+	TWEEN.version = version$1;
 
 	/**
 	 * @classdesc Information spot attached to panorama
@@ -2031,8 +2064,8 @@
 	    this.material.transparent = true;
 	    this.material.opacity = 0;
 
-	    this.scaleUpAnimation = new Tween.Tween();
-	    this.scaleDownAnimation = new Tween.Tween();
+	    this.scaleUpAnimation = new TWEEN.Tween();
+	    this.scaleDownAnimation = new TWEEN.Tween();
 
 
 	    const postLoad = function ( texture ) {
@@ -2049,13 +2082,13 @@
 
 	        textureScale.copy( this.scale );
 
-	        this.scaleUpAnimation = new Tween.Tween( this.scale )
+	        this.scaleUpAnimation = new TWEEN.Tween( this.scale )
 	            .to( { x: textureScale.x * scaleFactor, y: textureScale.y * scaleFactor }, duration )
-	            .easing( Tween.Easing.Elastic.Out );
+	            .easing( TWEEN.Easing.Elastic.Out );
 
-	        this.scaleDownAnimation = new Tween.Tween( this.scale )
+	        this.scaleDownAnimation = new TWEEN.Tween( this.scale )
 	            .to( { x: textureScale.x, y: textureScale.y }, duration )
-	            .easing( Tween.Easing.Elastic.Out );
+	            .easing( TWEEN.Easing.Elastic.Out );
 
 	        this.material.map = texture;
 	        this.material.needsUpdate = true;
@@ -2063,15 +2096,15 @@
 	    }.bind( this );
 
 	    // Add show and hide animations
-	    this.showAnimation = new Tween.Tween( this.material )
+	    this.showAnimation = new TWEEN.Tween( this.material )
 	        .to( { opacity: 1 }, duration )
 	        .onStart( this.enableRaycast.bind( this, true ) )
-	        .easing( Tween.Easing.Quartic.Out );
+	        .easing( TWEEN.Easing.Quartic.Out );
 
-	    this.hideAnimation = new Tween.Tween( this.material )
+	    this.hideAnimation = new TWEEN.Tween( this.material )
 	        .to( { opacity: 0 }, duration )
 	        .onStart( this.enableRaycast.bind( this, false ) )
-	        .easing( Tween.Easing.Quartic.Out );
+	        .easing( TWEEN.Easing.Quartic.Out );
 
 	    // Attach event listeners
 	    this.addEventListener( 'click', this.onClick );
@@ -4007,7 +4040,7 @@
 
 	    this.active = false;
 
-	    this.infospotAnimation = new Tween.Tween( this ).to( {}, this.animationDuration / 2 );
+	    this.infospotAnimation = new TWEEN.Tween( this ).to( {}, this.animationDuration / 2 );
 
 	    this.addEventListener( 'load', this.fadeIn.bind( this ) );
 	    this.addEventListener( 'panolens-container', this.setContainer.bind( this ) );
@@ -4448,8 +4481,8 @@
 
 	    setupTransitions: function () {
 
-	        this.fadeInAnimation = new Tween.Tween( this.material )
-	            .easing( Tween.Easing.Quartic.Out )
+	        this.fadeInAnimation = new TWEEN.Tween( this.material )
+	            .easing( TWEEN.Easing.Quartic.Out )
 	            .onStart( function () {
 
 	                this.visible = true;
@@ -4464,8 +4497,8 @@
 
 	            }.bind( this ) );
 
-	        this.fadeOutAnimation = new Tween.Tween( this.material )
-	            .easing( Tween.Easing.Quartic.Out )
+	        this.fadeOutAnimation = new TWEEN.Tween( this.material )
+	            .easing( TWEEN.Easing.Quartic.Out )
 	            .onComplete( function () {
 
 	                this.visible = false;
@@ -4480,8 +4513,8 @@
 
 	            }.bind( this ) );
 
-	        this.enterTransition = new Tween.Tween( this )
-	            .easing( Tween.Easing.Quartic.Out )
+	        this.enterTransition = new TWEEN.Tween( this )
+	            .easing( TWEEN.Easing.Quartic.Out )
 	            .onComplete( function () {
 
 	                /**
@@ -4494,8 +4527,8 @@
 	            }.bind ( this ) )
 	            .start();
 
-	        this.leaveTransition = new Tween.Tween( this )
-	            .easing( Tween.Easing.Quartic.Out );
+	        this.leaveTransition = new TWEEN.Tween( this )
+	            .easing( TWEEN.Easing.Quartic.Out );
 
 	    },
 
@@ -4830,7 +4863,7 @@
 	    createGeometry: function() {
 
 	        const geometry = new THREE.BufferGeometry();
-	        geometry.addAttribute( 'position', new THREE.BufferAttribute( new Float32Array(), 1 ) );
+	        geometry.setAttribute( 'position', new THREE.BufferAttribute( new Float32Array(), 1 ) );
 	        return geometry;
 
 	    },
@@ -4863,6 +4896,9 @@
 
 	    Panorama.call( this );
 
+	    this.geometry.deleteAttribute( 'normal' );
+	    this.geometry.deleteAttribute( 'uv' );
+
 	    this.images = images;
 	    this.type = 'cube_panorama';
 
@@ -4883,6 +4919,7 @@
 	        const uniforms = THREE.UniformsUtils.clone( _uniforms );
 	        
 	        uniforms.opacity.value = 0;
+	        uniforms.envMap.value = new THREE.CubeTexture();
 
 	        const material = new THREE.ShaderMaterial( {
 
@@ -4890,9 +4927,19 @@
 	            vertexShader,
 	            uniforms,
 	            side: THREE.BackSide,
-	            transparent: true,
-	            opacity: 0
+	            opacity: 0,
+	            transparent: true
 
+	        } );
+
+	        Object.defineProperty( material, 'envMap', {
+
+	            get: function () {
+
+	                return this.uniforms.envMap.value;
+	        
+	            }
+	        
 	        } );
 
 	        return material;
@@ -4925,8 +4972,8 @@
 	     * @instance
 	     */
 	    onLoad: function ( texture ) {
-			
-	        this.material.uniforms[ 'tCube' ].value = texture;
+
+	        this.material.uniforms.envMap.value = texture;
 
 	        Panorama.prototype.onLoad.call( this );
 
@@ -4934,7 +4981,7 @@
 
 	    getTexture: function () {
 
-	        return this.material.uniforms.tCube.value;
+	        return this.material.uniforms.envMap.value;
 
 	    },
 
@@ -4945,7 +4992,7 @@
 	     */
 	    dispose: function () {	
 
-	        const { value } = this.material.uniforms.tCube;
+	        const { value } = this.material.uniforms.envMap;
 
 	        this.images.forEach( ( image ) => { THREE.Cache.remove( image ); } );
 
@@ -6087,10 +6134,6 @@
 
 	            break;
 
-	        default:
-
-	            break;
-
 	        }
 
 	        this.onUpdateCallback();
@@ -6127,10 +6170,6 @@
 	            const distance = Math.sqrt( dx * dx + dy * dy );
 
 	            this.addZoomDelta( this.userMouse.pinchDistance - distance );
-
-	            break;
-
-	        default:
 
 	            break;
 
@@ -7679,7 +7718,7 @@
 
 	    const distortion = new THREE.Vector2( 0.441, 0.156 );
 
-	    const geometry = new THREE.PlaneBufferGeometry( 1, 1, 10, 20 ).removeAttribute( 'normal' ).toNonIndexed();
+	    const geometry = new THREE.PlaneBufferGeometry( 1, 1, 10, 20 ).deleteAttribute( 'normal' ).toNonIndexed();
 
 	    const positions = geometry.attributes.position.array;
 	    const uvs = geometry.attributes.uv.array;
@@ -7927,8 +7966,8 @@
 	    this.autoRotateRequestId = null;
 	    this.outputDivElement = null;
 	    this.touchSupported = 'ontouchstart' in window || window.DocumentTouch && document instanceof DocumentTouch;
-	    this.tweenLeftAnimation = new Tween.Tween();
-	    this.tweenUpAnimation = new Tween.Tween();
+	    this.tweenLeftAnimation = new TWEEN.Tween();
+	    this.tweenUpAnimation = new TWEEN.Tween();
 	    this.outputEnabled = false;
 	    this.viewIndicatorSize = indicatorSize;
 	    this.tempEnableReticle = enableReticle;
@@ -8869,7 +8908,7 @@
 
 	        this.camera.matrixWorldInverse.getInverse( this.camera.matrixWorld );
 	        this.cameraViewProjectionMatrix.multiplyMatrices( this.camera.projectionMatrix, this.camera.matrixWorldInverse );
-	        this.cameraFrustum.setFromMatrix( this.cameraViewProjectionMatrix );
+	        this.cameraFrustum.setFromProjectionMatrix( this.cameraViewProjectionMatrix );
 
 	        return sprite.visible && this.cameraFrustum.intersectsSprite( sprite );
 
@@ -8978,7 +9017,7 @@
 	        }
 
 	        duration = duration !== undefined ? duration : 1000;
-	        easing = easing || Tween.Easing.Exponential.Out;
+	        easing = easing || TWEEN.Easing.Exponential.Out;
 
 	        const { left, up } = this.calculateCameraDirectionDelta( vector );
 	        const rotateControlLeft = this.rotateControlLeft.bind( this );
@@ -8990,7 +9029,7 @@
 	        this.tweenLeftAnimation.stop();
 	        this.tweenUpAnimation.stop();
 
-	        this.tweenLeftAnimation = new Tween.Tween( ov )
+	        this.tweenLeftAnimation = new TWEEN.Tween( ov )
 	            .to( { left }, duration )
 	            .easing( easing )
 	            .onUpdate(function(ov){
@@ -8999,7 +9038,7 @@
 	            })
 	            .start();
 
-	        this.tweenUpAnimation = new Tween.Tween( ov )
+	        this.tweenUpAnimation = new TWEEN.Tween( ov )
 	            .to( { up }, duration )
 	            .easing( easing )
 	            .onUpdate(function(ov){
@@ -9141,9 +9180,6 @@
 
 	            case 'overlay':
 	                this.outputDivElement.textContent = message;
-	                break;
-
-	            default:
 	                break;
 
 	            }
@@ -9570,7 +9606,7 @@
 	     */
 	    update: function () {
 
-	        Tween.update();
+	        TWEEN.update();
 
 	        this.updateCallbacks.forEach( function( callback ){ callback(); } );
 
@@ -9974,7 +10010,7 @@
 	 * @author pchen66
 	 * @namespace PANOLENS
 	 */
-	window.TWEEN = Tween;
+	window.TWEEN = TWEEN;
 
 	exports.BasicPanorama = BasicPanorama;
 	exports.CONTROLS = CONTROLS;
@@ -10008,4 +10044,4 @@
 
 	Object.defineProperty(exports, '__esModule', { value: true });
 
-}));
+})));
